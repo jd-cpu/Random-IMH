@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>혈액내과 랜덤 Pre-test 퀴즈</title>
+  <link rel="manifest" href="manifest.json?v=5">
+  <meta name="theme-color" content="#4CAF50">
+  <style>
+    body { font-family: Arial, sans-serif; max-width:800px; margin:20px auto; padding:16px; text-align:center; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    h1 { margin:0; font-size:1.25rem; }
+    #status { color:#666; font-size:0.95rem; margin-top:8px; text-align:left; }
+    .question { margin:20px 0; font-size:1.15rem; white-space:pre-line; text-align:left; }
+    .answer { margin-top:10px; font-weight:600; color:#0a6; white-space:pre-line; display:none; text-align:left; }
+    .controls { margin-top:18px; }
+    button { padding:10px 14px; margin:6px; font-size:1rem; }
+    .progress-wrap { margin-top:14px; text-align:left; }
+    .progress-info { font-size:0.92rem; color:#444; margin-bottom:6px; }
+    .progress-bar { width:100%; height:12px; background:#eee; border-radius:8px; overflow:hidden; }
+    .progress-inner { height:100%; width:0%; background:#4caf50; transition: width 0.25s ease; }
+    small.note { display:block; color:#888; margin-top:8px; text-align:left; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>혈액내과 랜덤 Pre-test 퀴즈</h1>
+    <div>
+      <button id="btnToggleMode">복습 모드로</button>
+      <button id="btnReset">초기화</button>
+    </div>
+  </header>
+
+  <div id="status" aria-live="polite">로딩 중...</div>
+
+  <div class="question" id="question">문제가 여기에 표시됩니다.</div>
+  <div class="answer" id="answer"></div>
+
+  <div class="controls" id="controls">
+    <button id="btnShowAnswer">정답 보기</button>
+    <button id="btnMarkWrong">오답 저장</button>
+    <button id="btnPrev">이전 문제</button>
+    <button id="btnNext">다음 문제</button>
+    <!-- 복습 모드에서 첫 문제로 돌아가기 버튼 -->
+    <button id="btnRestartReview" style="display:none;">복습 첫 문제로</button>
+    <!-- 복습 모드에서 오답 제거 버튼 -->
+    <button id="btnRemoveWrong" style="display:none;">오답 제거</button>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-info" id="progressInfo">진행: 0 / 0 (남음: 0)</div>
+    <div class="progress-bar"><div id="progressInner" class="progress-inner"></div></div>
+    <small class="note">※ 정답 보기 버튼은 정답만 보여줍니다. 다음 문제로 이동하려면 '다음 문제' 버튼을 누르세요.</small>
+  </div>
+
+<script>
+  // 기존 문제 데이터
+  const questions = [
+    { q: "빈혈 평가할 수 있는 검사 4가지", a: "CBC: 적혈구 수, 혈색소, 적혈구 용적, 백혈 구 수 및 감별계수, 혈소판 수 <br>Corrected reticulocyte count <br>RBC index(MCV, MCH, MCHC) <br>PB smear" },
+    { q: "CBC에서 IDA를 시사하는 소견을 쓰시오.", a: "Hb, HCT 감소 <br>MCV, MCH 감소하고 빈혈이 심해지면 MCHC도 감소, RDW 증가" },
+    { q: "IDA 확진 검사는?", a: "혈청 ferritin: 체내의 저장 철의 양을 반영 <br>Serum ferritin < 10ng/mL" },
+    { q: "65세 남성이 IDA 진단을 받았는데 철분제 투여 전 해야할 검사는?", a: "철결핍성 빈혈이 일어난 원인을 규명하기 위한 검사 <br>위장관 출혈을 확인하기 위한 위식도 내시경, 대장 내시경을 시행" },
+    { q: "Vitamin B12 deficiency로 인한 anemia에서 적혈모세포 크기가 큰 이유", a: "Cobalamin 이 부족하면 DNA 합성을 위한 dTMP 와 methionine, purine이 부족해져 DNA 합성에 문제가 생긴다. <br>세포질은 hemoglobinization이 되지만 핵의 development, differentiation, DNA 복제는 멈춰서 작아지지 못하고 그 크기를 유지한다." },
+    { q: "Cobalamin deficiency의 원인 상태나 질환 4가지", a: "Pernicious anemia <br>Partial or total gastrectomy <br>Chronic pancreatitis <br>Crohn's disease <br>Jejunum: bacterial overgrowth, ileum: ileum resection" },
+    { q: "Vit B12 결핍에서 볼 수 있는 PB smear 소견을 2가지 이상 쓰시오.", a: "Macrocytic anemia, reticulocyte count 감소, hypersegmented neutrophil, leukopenia&thrombocytopenia" },
+    { q: "WBC, Hb, PLT 정상치 쓰시오.", a: "WBC: 4500~10000/mm^3 <br>Hb: 남자 13~16g/dL, 여자 12~15g/dL <br>Platelet: 150000~450000/mm^3" },
+    { q: "AML의 주요 임상 증상과 이유를 작성하시오.", a: "주요 임상 증상 <br> - Anemia: pallor, fatigue, exertional dyspnea <br> - Neutropenia: infection <br>Thrombocytopenia: bleeding, petechiae <br>이유: Bone marrow에 leukemic cell(blast)이 비정상적으로 증식하여 정상적인 조혈기능이 줄어 pancytopenia가 생깁니다." },
+    { q: "AML 진단기준을 간략히 서술하시오.", a: "골수검사에서 blast>20% 이상이면 acute leukemia, 이후 cytochemical staining 하여 MPO, SBB, specific esterase 양성이면 AML로 진단 가능 <br>AML 관련 recurrent genetic abnormalities(t(8;21), t(15;17), inv(16) 등) 이 있고 BM 에서 blast가 10% 이상이면 AML로 진단할 수 있다." },
+    { q: "AML의 좋은 cytogenetic abnormality 3가지", a: "t(8;21), t(15,17), inv(16)" },
+    { q: "APL에서 유전적 abnormality와 molecular fusion", a: "t(15, 17), PML-RAR alpha" },
+    { q: "APL에서 진단 시 또는 항암치료시 보이는 혈역학적 이상과 그 기전", a: "DIC <br>기전: granule이 많이 함유되어 있는 promyelocyte의 turnover가 많아져 granule들이 혈류로 분비되어 clotting system activation이 된다. 계속된 clot 형성과 fibrinolysis의 반복으로 인해 조절되지 않는 thrombin 생성과 응고인자/혈소판의 소비로 인해 DIC가 생긴다." },
+    { q: "APL의 치료", a: "ATRA, Anthracycline, ATO-arsenic trioxide" },
+    { q: "APL 환자에서 30일 이내 사망하는 가장 주요한 원인", a: "DIC 발생에 의한 뇌출혈" },
+    { q: "MDS에서 only curative therapy는?", a: "동종조혈모세포이식" },
+    { q: "MDS del(5q)이 있을 때 쓸 수 있는 치료제?", a: "Lenalidomide" },
+    { q: "MDS 환자에서 지속적으로 수혈을 해야 하는 경우 환자의 iron overload를 예방할 수 있는 방법", a: "Deferoxamine, deferasirox" },
+    { q: "이차성 적혈구 증가증 원인 4가지 이상 작성하시오", a: "Smoking(m/c) <br>Living at high altitude(고산병) <br>Congenital heart disease <br>Sleep apnea <br>Chronic lung disease(COPD) <br>Ectopic EPO producing tumor(ex. RCC, HCC) <br>Renovascular hypertension(renal a. stenosis 있으면 신장으로 들어오는 혈액량 감소해서 EPO 증가) <br>Andropause 환자에서 testosterone replacement 하는 경우 -> Hb 증가" },
+    { q: "중증 재생불량성 빈혈 진단 기준", a: "1) 빈혈을 동반한 corrected reticulocyte count가 1% 이하 <br>2) 과립구 감소, ANC ≤ 500mm^3 <br>혈소판 20000/mm^3 이하" },
+    { q: "ET에서 high risk 3가지", a: "Prior thrombosis, Age > 60, PLT > 150만개" },
+    { q: "Platelet이 상승하여 ET 의심환자에서 시행할 수 있는 분자생물학적 검사 3가지", a: "JAK2 V617F mutation test <br>CALR mutation test <br>CMPL mutation test" },
+    { q: "PV의 치료원칙", a: "Phlebotomy와 low dose aspirin을 사용하고, 60세 이상, thrombosis의 Hx가 있는 등 high risk patient에서는 hydroxyurea를 사용하는데, 임산부의 경우 Interferon을 사용한다." },
+    { q: "동종 조혈모세포이식 후 급성이식편대숙주병이 나타나는 주요 장기와 증상을 서술하시오.", a: "Skin(홍반), GI tract(설사, 혈변), liver(간기능저하) <br>참고) GVHD 치료: Steroid" },
+    { q: "Polycythemia vera 환자의 진단 시 중요한 molecular abnormality는?", a: "JAK2 V617F mutation, JAK2 exon 12 mutation" },
+    { q: "Spinal cord injury", a: "High dose dexamethasone" },
+    { q: "MM에서 CRAB에 대해 설명하시오.", a: "C: hypercalcemia(Ca2+ > 11.5 mg/dL) <br>R: renal dysfunction/insufficiency(Cr > 2.0 mg/dL) <br>A: anemia(Hb < 10g/dL) <br>B: osteolytic bone lesion" },
+    { q: "MM에서 hyperviscosity의 증상완화를 위한 치료는?", a: "Plasmapheresis" },
+    { q: "MM에서 신부전의 중요한 원인", a: "Cast nephropathy: Light chain의 침착으로 인한 신세뇨관 손상(tubular damage)" },
+    { q: "MM에서 normocytic normochromic anemia가 생기는 이유", a: "골수를 plasma cell이 가득 채워 hematopoietic stem cell이 들어갈 자리가 없어 조혈기능이 감소하여 빈혈이 발생" },
+    { q: "MGUS의 진단기준과 그 임상적 의의를 서술하시오.", a: "BM plasma cell < 10%, Serum M protein < 3g/dL, CRAB(-) <br>MGUS 환자의 1~3% 에서 1년 내 다발골수종으로 진행하므로" },
+    { q: "MM에 쓰는 CD38 단클론항체?", a: "Daratumumab" },
+    { q: "MM의 이중표적항체 치료제의 기전?", a: "Teclistamab은 이중표적항체로써 한쪽은 MM cell의 BCMA, 다른쪽은 T cell의 CD3 receptor를 타겟으로 하여 T cell을 활성화. 활성화된 T cell이 BCMA(+) MM cell을 공격(일종의 immunotherapy)" },
+    { q: "MM에서 폐렴과 신우신염이 호발하는 원인", a: "(Functional) Hypogammaglobulinemia" },
+    { q: "CML 주요 치료제 2가지 이상 쓰시오.", a: "Imatinib, dasatinib, nilotinib" },
+    { q: "CML의 PB smear, 복부 P.Ex 소견, 염색체검사, 분자생물학적 검사", a: "PB smear: leukocytosis와 골수구계의 전 spectrum이 보임. <br>복부 P.Ex: 비장종대 때문에 조기 포만감 및 좌상복부 동통 혹은 종괴가 나타남. <br>염색체 검사: Philadelphia chromosome 양성. t(9;22) <br>분자생물학적 검사: BCR-ABL fusion gene과 fusion protein P210BCR-ABL이 보임." },
+    { q: "TTP 진단 시 특정 enzyme의 기능이 10% 이하로 떨어진다. 이 enzyme의 이름은?", a: "ADAMTS13" },
+    { q: "TTP의 진단에 필요한 pentad", a: "Thrombocytopenia, microangiopathic hemolytic anemia(MAHA), acute kidney injury, neuorologic symptoms(thrombosis 로 인한 brain damage), fever" },
+    { q: "TTP로 처음 진단 받은 환자, 가장 우선으로 해야하는 치료", a: "Plasmapheresis + steroid" },
+    { q: "AML에 대한 관해유도 치료를 위해 항암제를 사용하는 환자에서 항암치료 후 14일 차에 발열이 생겼다. 치료를 위한 조치는?", a: "CBC와 혈액배양검사를 하여 감염의 원인을 찾고, 그동안 검사결과가 나오기 전에 호중구 감소성 발열이 의심되기 때문에 즉각적인 광범위 항생제 치료를 해야한다." },
+    { q: "Lymphoma 에서 Ann-Arbor stage 설명", a: "<img src='1.png' style='max-width:600px;'>" },
+    { q: "Anterior mediastinal mass 관찰될 때 의심할 수 있는 질환 3 가지", a: "Thymoma, lymphoma, germ cell tumor" },
+    { q: "림프종 병기 설정을 하던 중 CSF를 검사해야 하는 특정한 경우 3가지", a: "(임시해설) <br>1) 중추신경계 침범 위험이 높은 경우(Burkitt's lymphoma, DLBCL 등 <br>2) 임상적으로 CNS 침범이 의심될 때 <br>3) 고위험 위치 침범 시(고환, 부비동, 척수나 뇌막 인접 병변)" },
+    { q: "DLBCL SVC syndrome 치료는?", a: "Diuretics, low salt diet <br>Primary disease에 따른 치료: 빠르게 chemotherapy(rituximab + CHOP) <br> - CHOP: cyclophosphamide + doxorubicin + vincristine + prednisolone <br> - Prednisolone 을 주는 이유: 면역억제 효과 + lymphocyte apoptosis 유발 효과를 가지고 있어 림프구 기원 암세포 치료에 포함" },
+    { q: "Cryoprecipitate 주요 성분", a: "Fibrinogen, factor VIII, vWF" },
+    { q: "혈우병 A 환자 소견(PLT, PT, aPTT, BT)", a: "PLT 정상, PT 정상, aPTT prolongation, BT 정상" },
+    { q: "DIC 소견(PLT, fibrinogen, FDP, PT, aPTT, antithrombin, vWF", a: "PLT 감소, fibrinogen 감소, FDP 증가, PT 증가, aPTT prolongation, antithrombin 감소, vWF 증가" }
+  ];
+
+  const KEY = {
+    WRONG: 'quiz_wrong_v1',
+    MODE: 'quiz_mode_v1',
+    NORMAL_ORDER: 'quiz_normal_order_v1',
+    NORMAL_IDX: 'quiz_normal_idx_v1',
+    REVIEW_ORDER: 'quiz_review_order_v1',
+    REVIEW_IDX: 'quiz_review_idx_v1'
+  };
+
+  let wrongList   = JSON.parse(localStorage.getItem(KEY.WRONG) || '[]');
+  let mode        = localStorage.getItem(KEY.MODE) || 'normal';
+  let orderNormal = JSON.parse(localStorage.getItem(KEY.NORMAL_ORDER) || 'null');
+  let idxNormal   = parseInt(localStorage.getItem(KEY.NORMAL_IDX) || '0', 10);
+  let orderReview = JSON.parse(localStorage.getItem(KEY.REVIEW_ORDER) || 'null');
+  let idxReview   = parseInt(localStorage.getItem(KEY.REVIEW_IDX) || '0', 10);
+
+  const elStatus          = document.getElementById('status');
+  const elQuestion        = document.getElementById('question');
+  const elAnswer          = document.getElementById('answer');
+  const elBtnShow         = document.getElementById('btnShowAnswer');
+  const elBtnWrong        = document.getElementById('btnMarkWrong');
+  const elBtnNext         = document.getElementById('btnNext');
+  const elBtnPrev         = document.getElementById('btnPrev');
+  const elBtnToggle       = document.getElementById('btnToggleMode');
+  const elBtnReset        = document.getElementById('btnReset');
+  const elProgressInfo    = document.getElementById('progressInfo');
+  const elProgressInner   = document.getElementById('progressInner');
+  const elBtnRestartReview= document.getElementById('btnRestartReview');
+  const elBtnRemoveWrong  = document.getElementById('btnRemoveWrong');
+
+  function shuffledArray(n){
+    const arr = Array.from({length:n}, (_,i)=>i);
+    for(let i=arr.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+  }
+
+  function saveAll(){
+    localStorage.setItem(KEY.WRONG, JSON.stringify(wrongList));
+    localStorage.setItem(KEY.MODE, mode);
+    if(orderNormal) localStorage.setItem(KEY.NORMAL_ORDER, JSON.stringify(orderNormal));
+    localStorage.setItem(KEY.NORMAL_IDX, String(idxNormal));
+    if(orderReview) localStorage.setItem(KEY.REVIEW_ORDER, JSON.stringify(orderReview));
+    localStorage.setItem(KEY.REVIEW_IDX, String(idxReview));
+  }
+
+  function clearAll(){
+    localStorage.removeItem(KEY.WRONG);
+    localStorage.removeItem(KEY.MODE);
+    localStorage.removeItem(KEY.NORMAL_ORDER);
+    localStorage.removeItem(KEY.NORMAL_IDX);
+    localStorage.removeItem(KEY.REVIEW_ORDER);
+    localStorage.removeItem(KEY.REVIEW_IDX);
+    wrongList = [];
+    mode = 'normal';
+    orderNormal=null; orderReview=null;
+    idxNormal=0; idxReview=0;
+  }
+
+  function ensureOrders(skipShuffle=false){
+    // ✅ 일반 모드 순서 보장 (기본: 처음 한 번 섞고 고정)
+    if(!Array.isArray(orderNormal) || orderNormal.length !== questions.length){
+      orderNormal = Array.from({length: questions.length}, (_,i)=>i);
+      if(!skipShuffle){
+        orderNormal.sort(()=>Math.random()-0.5);
+      }
+    }
+
+    // ✅ 복습 모드 순서 보장
+    if(!Array.isArray(orderReview) || orderReview.length !== wrongList.length){
+      orderReview = Array.from({length: wrongList.length}, (_,i)=>i);
+    }
+
+    // ✅ 인덱스 보정
+    idxNormal = Math.min(Math.max(0, idxNormal), Math.max(0, orderNormal.length-1));
+    idxReview = Math.min(Math.max(0, idxReview), Math.max(0, wrongList.length-1));
+  }
+
+  function currentListAndIndex(){
+    if(mode==='normal'){
+      return {listType:'normal', order:orderNormal, idx:idxNormal, total:orderNormal.length};
+    } else {
+      return {listType:'review', order:orderReview, idx:idxReview, total:orderReview.length};
+    }
+  }
+
+  function getCurrentQuestion(){
+    const info = currentListAndIndex();
+    if(info.total===0) return null;
+    if(info.listType==='normal'){
+      return questions[info.order[info.idx]];
+    } else {
+      return wrongList[info.order[info.idx]];
+    }
+  }
+
+  function updateProgressBar(idx,total,percent){
+    elProgressInfo.innerText=`진행: ${idx}/${total}  (${percent}%)`;
+    elProgressInner.style.width=total===0?'0%':`${percent}%`;
+  }
+
+  function updateToggleText(){
+    elBtnToggle.textContent = mode==='normal'?`복습 모드 (${wrongList.length})`:'일반 모드로';
+  }
+
+  function render(skipShuffle=false){
+    ensureOrders(skipShuffle);
+    saveAll();
+    const info=currentListAndIndex();
+
+    // 버튼 표시
+    if(mode==='review' && info.total>0){
+      elBtnRestartReview.style.display='inline-block';
+      elBtnRemoveWrong.style.display='inline-block';
+    } else {
+      elBtnRestartReview.style.display='none';
+      elBtnRemoveWrong.style.display='none';
+    }
+
+    if(info.total===0){
+      elStatus.innerText = mode==='normal'? '문제가 비어있습니다. questions 배열을 채워주세요.' : '복습할 문제가 없습니다.';
+      elQuestion.innerText = mode==='normal'? '문제가 없습니다.' : '복습할 문제가 없습니다.';
+      elAnswer.style.display='none';
+      updateProgressBar(0,info.total,0);
+      updateToggleText();
+      return;
+    }
+
+    // 완료 상태
+    if(info.idx >= info.total){
+      elQuestion.innerText='모든 문제가 완료되었습니다.';
+      elAnswer.style.display='none';
+      updateProgressBar(info.total, info.total, 100);
+      updateToggleText();
+      return;
+    }
+
+    const cur = getCurrentQuestion();
+    if(!cur){
+      elQuestion.innerText='문제가 없습니다.';
+      elAnswer.style.display='none';
+      updateProgressBar(info.idx,info.total,Math.round((info.idx/Math.max(1,info.total))*100));
+      updateToggleText();
+      return;
+    }
+
+    elQuestion.innerHTML = cur.q;
+    elAnswer.innerHTML = cur.a;
+    elAnswer.style.display='none';
+
+    const currentNumber=info.idx+1;
+    const remaining=Math.max(0,info.total-info.idx-1);
+    elStatus.innerText=`모드: ${mode==='normal'?'일반':'복습'}  •  ${currentNumber} / ${info.total}  (남음: ${remaining})`;
+    updateProgressBar(info.idx, info.total, Math.round((info.idx/Math.max(1,info.total))*100));
+    updateToggleText();
+  }
+
+  function showAnswer(){
+    const cur = getCurrentQuestion();
+    if(!cur) return;
+    elAnswer.style.display='block';
+  }
+
+  function markWrong(){
+    const info=currentListAndIndex();
+    if(info.total===0 || info.idx>=info.total) return;
+    const cur=getCurrentQuestion();
+    if(!cur) return;
+    if(!wrongList.some(it=>it.q===cur.q && it.a===cur.a)){
+      wrongList.push({q:cur.q,a:cur.a});
+      orderReview = Array.from({length: wrongList.length}, (_,i)=>i); // 새로 고정
+      idxReview=Math.min(idxReview, orderReview.length-1);
+      saveAll();
+      updateToggleText();
+    }
+  }
+
+  function removeWrong(){
+    const cur = getCurrentQuestion();
+    if(!cur) return;
+    if(removeFromWrongListByQA(cur.q, cur.a)){
+      render();
+    }
+  }
+
+  function nextQuestion(){
+    const info=currentListAndIndex();
+    if(info.total===0){ render(); return; }
+    if(info.listType==='normal'){
+      idxNormal++;
+      if(idxNormal>info.total) idxNormal=info.total;
+    } else {
+      idxReview++;
+      if(idxReview>info.total) idxReview=info.total;
+    }
+    saveAll();
+    render();
+  }
+
+  function prevQuestion(){
+    const info=currentListAndIndex();
+    if(info.total===0){ render(); return; }
+    if(info.listType==='normal'){
+      if(idxNormal<=0) return;
+      idxNormal = Math.max(0, idxNormal-1);
+      const prev = questions[orderNormal[idxNormal]];
+      if(prev) removeFromWrongListByQA(prev.q,prev.a);
+    } else {
+      if(idxReview<=0) return;
+      idxReview=Math.max(0, idxReview-1);
+    }
+    saveAll();
+    render();
+  }
+
+  function removeFromWrongListByQA(q,a){
+    const i = wrongList.findIndex(it => it.q === q && it.a === a);
+    if(i!==-1){
+      wrongList.splice(i,1);
+      // 순서 재구성 및 인덱스 보정
+      orderReview = Array.from({length: wrongList.length}, (_,k)=>k);
+      if(idxReview >= wrongList.length){
+        idxReview = Math.max(0, wrongList.length - 1);
+      }
+      saveAll();
+      updateToggleText();
+      return true;
+    }
+    return false;
+  }
+
+  function restartReview(){
+    idxReview=0;
+    saveAll();
+    render();
+  }
+
+  function toggleMode(){
+    mode = (mode==='normal')?'review':'normal';
+    localStorage.setItem(KEY.MODE, mode);
+    if(mode==='review' && wrongList.length===0){
+      alert('복습할 오답이 없습니다.');
+      mode='normal';
+      localStorage.setItem(KEY.MODE, mode);
+      return;
+    }
+    ensureOrders();
+    render();
+  }
+
+  function resetProgress(){
+    if(!confirm('진행 상황(섞인 순서 및 인덱스)과 오답 목록을 초기화할까요?')) return;
+    clearAll();
+    ensureOrders();
+    saveAll();
+    render();
+  }
+
+  elBtnShow.addEventListener('click', showAnswer);
+  elBtnWrong.addEventListener('click', markWrong);
+  elBtnNext.addEventListener('click', nextQuestion);
+  elBtnPrev.addEventListener('click', prevQuestion);
+  elBtnToggle.addEventListener('click', toggleMode);
+  elBtnReset.addEventListener('click', resetProgress);
+  elBtnRestartReview.addEventListener('click', restartReview);
+  elBtnRemoveWrong.addEventListener('click', removeWrong);
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js?v=5').catch(e=>{
+        console.warn('ServiceWorker 등록 실패:', e);
+      });
+    });
+  }
+
+  ensureOrders();
+  render();
+</script>
+</body>
+</html>
